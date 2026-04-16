@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
-# ============================================================
-#  email.sh — Simple Email Report Module
-#  Sends the plain text report via email.
-# ============================================================
+# script to send emails
 
-# send_report_email <recipient> <report_type>
+# helper to build the email message with HTML body and TXT attachment
 _build_mime() {
     local recipient="$1"
     local subject="$2"
@@ -17,7 +14,7 @@ _build_mime() {
     echo "MIME-Version: 1.0"
     echo "Content-Type: multipart/mixed; boundary=\"${boundary}\""
     echo ""
-    echo "This is a multi-part message in MIME format."
+    echo "MIME message"
     echo ""
     echo "--${boundary}"
     echo "Content-Type: text/html; charset=UTF-8"
@@ -25,7 +22,7 @@ _build_mime() {
     if [[ -n "${html_path}" && -f "${html_path}" ]]; then
         cat "${html_path}"
     else
-        echo "<p>Please find the audit report attached.</p>"
+        echo "<p>See attachment for audit report.</p>"
     fi
     echo ""
     echo "--${boundary}"
@@ -38,56 +35,57 @@ _build_mime() {
     echo "--${boundary}--"
 }
 
+# main function for sending reports
 send_report_email() {
-    local recipient="${1:-${DEFAULT_EMAIL}}" # empty email address => use default email address 
-    local type="${2:-full}" # empty report type => use full report type 
-    local txt_path="${LAST_REPORT_TXT:-}" # empty report path => use last report path 
-    local html_path="${LAST_REPORT_HTML:-}" # HTML report for the email body
+    local recipient="${1:-${DEFAULT_EMAIL}}" 
+    local type="${2:-full}" 
+    local txt_path="${LAST_REPORT_TXT:-}" 
+    local html_path="${LAST_REPORT_HTML:-}" 
 
-    # --- Validate report file exists ---
-    if [[ -z "${txt_path}" || ! -f "${txt_path}" ]]; then # check if the report file is empty or not found 
-        log_error "No report found. Generate a report first."
+    # make sure report file exists
+    if [[ -z "${txt_path}" || ! -f "${txt_path}" ]]; then 
+        log_error "Can't find report file."
         return 1
     fi
 
-    # --- Validate email address ---
-    if ! echo "${recipient}" | grep -qE '^[^@]+@[^@]+\.[^@]+$'; then # check if the email address is valid 
-        log_error "Invalid email address: ${recipient}"
+    # basic email check
+    if ! echo "${recipient}" | grep -qE '^[^@]+@[^@]+\.[^@]+$'; then 
+        log_error "Email address looks wrong: ${recipient}"
         return 1
     fi
 
-    local subject="${EMAIL_SUBJECT_PREFIX} $(hostname -s) — ${type^} Audit — $(date '+%Y-%m-%d')" # define subject of the email 
+    local subject="${EMAIL_SUBJECT_PREFIX} $(hostname -s) — ${type^} Audit — $(date '+%Y-%m-%d')" 
 
-    color_echo CYAN "  Sending report to ${recipient} using ${MAIL_TOOL}..."
+    color_echo CYAN "  Mailing report to ${recipient}..."
 
-    case "${MAIL_TOOL}" in # check the mail tool 
+    # choose tool based on config
+    case "${MAIL_TOOL}" in 
         msmtp) 
-            if ! command -v msmtp &>/dev/null; then # check if the mail tool is installed 
-                log_error "msmtp not found. Install: sudo apt install msmtp"
+            if ! command -v msmtp &>/dev/null; then 
+                log_error "msmtp is missing."
                 return 1
             fi
-            (echo "From: ${DEFAULT_EMAIL}"; _build_mime "${recipient}" "${subject}" "${txt_path}" "${html_path}") | msmtp -a default "${recipient}" # send the report to the recipient 
+            (echo "From: ${DEFAULT_EMAIL}"; _build_mime "${recipient}" "${subject}" "${txt_path}" "${html_path}") | msmtp -a default "${recipient}" 
             ;;
         mail|mailx)
-            if ! command -v "${MAIL_TOOL}" &>/dev/null; then # check if the mail tool is installed 
-                log_error "${MAIL_TOOL} not found."
+            if ! command -v "${MAIL_TOOL}" &>/dev/null; then 
+                log_error "${MAIL_TOOL} is missing."
                 return 1
             fi
-            "${MAIL_TOOL}" -s "${subject}" "${recipient}" < "${txt_path}" # send the report to the recipient 
+            "${MAIL_TOOL}" -s "${subject}" "${recipient}" < "${txt_path}" 
             ;;
         sendmail)
-            if ! command -v sendmail &>/dev/null; then # check if the mail tool is installed 
-                log_error "sendmail not found."
+            if ! command -v sendmail &>/dev/null; then 
+                log_error "sendmail is missing."
                 return 1
             fi
-            _build_mime "${recipient}" "${subject}" "${txt_path}" "${html_path}" | sendmail "${recipient}" # send the report to the recipient 
+            _build_mime "${recipient}" "${subject}" "${txt_path}" "${html_path}" | sendmail "${recipient}" 
             ;;
         *)
-            log_error "Unknown MAIL_TOOL '${MAIL_TOOL}' in config.sh" # unknown mail tool 
+            log_error "Unknown tool in config: ${MAIL_TOOL}" 
             return 1
             ;;
     esac
 
-    log_info "Report emailed to ${recipient} via ${MAIL_TOOL}"
-    color_echo GREEN "  ✔ Email sent successfully."
+    log_info "Email sent to ${recipient}"
 }

@@ -1,52 +1,37 @@
 #!/usr/bin/env bash
-# ============================================================
-#  remote.sh — Multi-Host Remote Audit Module
-#  Connects to hosts defined in REMOTE_HOSTS (config.sh),
-#  copies hw_audit.sh & sw_audit.sh to each remote host,
-#  runs them, collects the output, and sends the report to
-#  the administrator's PC.
-# ============================================================
+# Functions for running remote audits via SSH
 
-# _parse_host_entry <entry>
-# Parses "user@host:port:ssh_key" into variables.
+# parse "user@host:port:key" into variables
 _parse_host_entry() {
     local entry="$1"
-    # Format: user@host:port:key_path
     R_USERHOST="${entry%%:*}"
     local rest="${entry#*:}"
     if [[ "${rest}" == "${entry}" ]]; then
-        # No colon found — only user@host
         R_PORT="22"
         R_KEY=""
     else
         R_PORT="${rest%%:*}"
         R_KEY="${rest#*:}"
-        # If port was empty, default to 22
         [[ -z "${R_PORT}" ]] && R_PORT="22"
-        # If key is same as port (no second colon), clear it
         [[ "${R_KEY}" == "${R_PORT}" ]] && R_KEY=""
     fi
 }
 
-# _build_ssh_opts
-# Builds SSH options string from parsed host entry.
+# helper for ssh flags
 _build_ssh_opts() {
     local opts="-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -p ${R_PORT}"
     [[ -n "${R_KEY}" ]] && opts="${opts} -i ${R_KEY}"
     echo "${opts}"
 }
 
-# _build_scp_opts
-# Builds SCP options string from parsed host entry.
+# helper for scp flags
 _build_scp_opts() {
     local opts="-o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=10 -P ${R_PORT}"
     [[ -n "${R_KEY}" ]] && opts="${opts} -i ${R_KEY}"
     echo "${opts}"
 }
 
-# run_remote_audit_single <host_entry>
-# Connects to one host, copies hw_audit.sh & sw_audit.sh,
-# runs them, and saves the output locally.
+# audit one remote machine
 run_remote_audit_single() {
     local entry="$1"
     _parse_host_entry "${entry}"
@@ -60,13 +45,12 @@ run_remote_audit_single() {
     safe_name=$(echo "${R_USERHOST}" | tr '@' '_' | tr '.' '_')
     local output_file="${REPORT_DIR}/remote_${safe_name}_${ts}.txt"
 
-    # Remote temporary directory for audit scripts
+    # temp folder on the remote side
     local remote_tmp="/tmp/sys_audit_${ts}"
 
     color_echo CYAN "  Connecting to ${R_USERHOST} (port ${R_PORT})..."
 
-    # --- Step 1: Create temp directory on remote host ---
-    # shellcheck disable=SC2086
+    # 1. create temp folder
     if ! ssh ${ssh_opts} "${R_USERHOST}" "mkdir -p '${remote_tmp}'" 2>/dev/null; then
         log_error "SSH connection failed: ${R_USERHOST} (port ${R_PORT})"
         color_echo RED "  - ${R_USERHOST} — connection failed"
@@ -74,9 +58,8 @@ run_remote_audit_single() {
         return 1
     fi
 
-    # --- Step 2: Copy audit scripts to remote host ---
+    # 2. upload scripts
     color_echo CYAN "  Uploading hw_audit.sh & sw_audit.sh to ${R_USERHOST}..."
-    # shellcheck disable=SC2086
     scp ${scp_opts} \
         "${SCRIPT_DIR}/hw_audit.sh" \
         "${SCRIPT_DIR}/sw_audit.sh" \
@@ -90,25 +73,19 @@ run_remote_audit_single() {
         return 1
     fi
 
-    # --- Step 3: Run hw_audit.sh & sw_audit.sh on remote host ---
+    # 3. run the audit on the remote machine
     color_echo CYAN "  Running hw_audit.sh & sw_audit.sh on ${R_USERHOST}..."
 
-    # Build a wrapper script that sources the audit modules and runs them.
-    # The wrapper generates a text report directly on the remote host.
-    # shellcheck disable=SC2086,SC2029
     ssh ${ssh_opts} "${R_USERHOST}" bash <<REMOTE_WRAPPER > "${output_file}" 2>/dev/null
 #!/usr/bin/env bash
-# --- Setup logging stubs & color helpers ---
 AUDIT_LOG="/dev/null"
 source '${remote_tmp}/lib_colors.sh'
 source '${remote_tmp}/hw_audit.sh'
 source '${remote_tmp}/sw_audit.sh'
 
-# --- Run both audits ---
 collect_hw_info
 collect_sw_info
 
-# --- Generate a text report to stdout ---
 echo "########################################################################"
 printf "#  %-68s  #\n" "REMOTE SYSTEM AUDIT REPORT"
 echo "########################################################################"
@@ -201,8 +178,7 @@ REMOTE_WRAPPER
 
     local audit_rc=$?
 
-    # --- Step 4: Clean up remote temp files ---
-    # shellcheck disable=SC2086,SC2029
+    # 4. cleanup
     ssh ${ssh_opts} "${R_USERHOST}" "rm -rf '${remote_tmp}'" 2>/dev/null
 
     if [[ ${audit_rc} -eq 0 ]] && [[ -s "${output_file}" ]]; then
@@ -217,12 +193,10 @@ REMOTE_WRAPPER
     fi
 }
 
-# run_remote_audit_all
-# Loops through all REMOTE_HOSTS and runs audit on each one.
+# loop through all remote hosts
 run_remote_audit_all() {
     if [[ ${#REMOTE_HOSTS[@]} -eq 0 ]]; then
         color_echo YELLOW "  No remote hosts configured in config.sh"
-        color_echo YELLOW "  Add hosts to the REMOTE_HOSTS array to use this feature."
         return 0
     fi
 
@@ -234,7 +208,6 @@ run_remote_audit_all() {
     echo ""
 
     for entry in "${REMOTE_HOSTS[@]}"; do
-        # Skip empty lines and comments
         [[ -z "${entry}" || "${entry}" == \#* ]] && continue
 
         if run_remote_audit_single "${entry}"; then
@@ -247,16 +220,11 @@ run_remote_audit_all() {
     echo ""
     color_echo CYAN "  -- Remote Audit Summary --"
     color_echo GREEN "  + Success: ${success}"
-    if [[ ${failed} -gt 0 ]]; then
-        color_echo RED "  - Failed:  ${failed}"
-    fi
+    [[ ${failed} -gt 0 ]] && color_echo RED "  - Failed:  ${failed}"
     color_echo CYAN "  Reports saved to: ${REPORT_DIR}"
-    color_echo GREEN "  + All reports collected on this PC (administrator)."
 }
 
-
-# push_report_remote <user@host>
-# Pushes the last generated report to a single remote server via SCP.
+# push report to remote server
 push_report_remote() {
     local target="${1:-}"
     local report_path="${LAST_REPORT_TXT:-}"
@@ -267,7 +235,7 @@ push_report_remote() {
     fi
 
     if [[ -z "${report_path}" || ! -f "${report_path}" ]]; then
-        log_error "No report file found. Generate a report first."
+        log_error "No report file found."
         return 1
     fi
 
@@ -277,19 +245,15 @@ push_report_remote() {
     scp_opts=$(_build_scp_opts)
 
     color_echo CYAN "  Creating remote directory on ${R_USERHOST}..."
-    # shellcheck disable=SC2029,SC2086
     if ssh ${ssh_opts} "${R_USERHOST}" "mkdir -p '${REMOTE_REPORT_DIR}'" 2>/dev/null; then
         color_echo CYAN "  Transferring report..."
-        # shellcheck disable=SC2086
         scp ${scp_opts} "${report_path}" "${R_USERHOST}:${REMOTE_REPORT_DIR}/" 2>/dev/null
-        # Also send JSON and SHA256 if they exist
         [[ -f "${report_path%.txt}.json" ]] && scp ${scp_opts} "${report_path%.txt}.json" "${R_USERHOST}:${REMOTE_REPORT_DIR}/" 2>/dev/null
         [[ -f "${report_path}.sha256" ]] && scp ${scp_opts} "${report_path}.sha256" "${R_USERHOST}:${REMOTE_REPORT_DIR}/" 2>/dev/null
-
-        log_info "Report pushed to ${R_USERHOST}:${REMOTE_REPORT_DIR}/"
+        log_info "Report pushed to ${R_USERHOST}"
         color_echo GREEN "  + Remote push complete."
     else
-        log_error "SSH connection to ${R_USERHOST} failed."
+        log_error "SSH connection failed."
         return 1
     fi
 }

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# ============================================================
-#  lib_colors.sh — Terminal color helpers & logging utilities
-# ============================================================
+# colors and logging stuff
 
 # ANSI color codes
 RED='\033[0;31m'
@@ -11,7 +9,7 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 RESET='\033[0m'
 
-# color_echo COLOR "message"
+# print with a specific color
 color_echo() {
     local color_name="$1"
     local msg="$2"
@@ -19,8 +17,7 @@ color_echo() {
     echo -e "${code}${msg}${RESET}"
 }
 
-# ── Logging -
-# Appends a timestamped INFO entry to the audit log
+# functions for logging with timestamps
 log_info() {
     local msg="$1"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO]  ${msg}" >> "${AUDIT_LOG:-/tmp/audit.log}"
@@ -38,13 +35,13 @@ log_error() {
     color_echo RED "-  ${msg}" >&2
 }
 
-# Prints a section separator to stdout (used inside reports)
+# visual divider
 separator() {
     printf '%0.s─' {1..70} 
     echo ""
 }
 
-# Prints a bold section header to stdout
+# bold header for sections
 section_header() {
     local title="$1"
     echo ""

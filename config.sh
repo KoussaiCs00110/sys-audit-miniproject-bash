@@ -1,47 +1,31 @@
 #!/usr/bin/env bash
-# ============================================================
-#  config.sh — Global configuration for the Audit System
-#  Edit the variables below to match your environment.
-# ============================================================
+# config settings for the audit script
 
-# ── Directories 
+# where to save reports and logs
 REPORT_DIR="/var/log/sys_audit/reports"
 LOG_DIR="/var/log/sys_audit/logs"
 AUDIT_LOG="${LOG_DIR}/audit.log"
 
-# ── Email settings 
-# Set the default recipient; can be overridden via --email flag
-<<<<<<< HEAD
-DEFAULT_EMAIL="your@gmail.com"
-=======
+# email stuff
 DEFAULT_EMAIL="saadbelouadahchess@gmail.com"
->>>>>>> b517451 (Initial commit of Linux System Audit MiniProject)
 EMAIL_SUBJECT_PREFIX="[SysAudit]"
-# Mail tool: mail | mailx | msmtp | sendmail
-MAIL_TOOL="msmtp"
+MAIL_TOOL="msmtp" # can use mail, mailx, msmtp, sendmail
 
-# ── Remote hosts for SSH audit 
-# Add one entry per line: "user@host:port:path_to_ssh_key"
-# - port is optional (defaults to 22)
-# - ssh_key is optional (defaults to ~/.ssh/id_rsa)
-# Example:
-#   REMOTE_HOSTS=(
-#       "root@192.168.1.10:22:/home/user/.ssh/id_rsa"
-#       "admin@192.168.1.20:22:"
-#       "user@server3.local:2222:/home/user/.ssh/server3_key"
-#   )
+# remote hosts list for ssh
+# format: "user@host:port:key_path"
+# port defaults to 22 if empty
 REMOTE_HOSTS=(
     # "root@192.168.1.10:22:/home/user/.ssh/id_rsa"
-    # "admin@192.168.1.20:22:"
 )
 
-# Remote directory where reports are stored on each host
+# where remote reports go
 REMOTE_REPORT_DIR="/var/log/sys_audit/remote_reports"
-# ── CPU alert threshold (percentage) 
+
+# alert if cpu higher than this
 CPU_ALERT_THRESHOLD=80
 
-# ── Report retention (days before rotation) 
+# how long to keep logs
 LOG_RETENTION_DAYS=30
 
-# ── Cron schedule (used only for documentation / setup helper)
-CRON_SCHEDULE="0 4 * * *"   # daily at 04:00 AM
+# when to run cron task
+CRON_SCHEDULE="0 4 * * *"

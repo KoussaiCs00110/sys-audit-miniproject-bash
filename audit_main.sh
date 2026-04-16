@@ -1,33 +1,28 @@
 #!/usr/bin/env bash
-# ============================================================
-#  audit_main.sh — Main entry point for the Linux Audit System
-#  NSCS Mini-Project Part 1 — Academic Year 2025/2026
-#  Author : belouadah saad eddine koussai 
-# ============================================================
-# Usage:
-#   ./audit_main.sh [--short | --full] [--email <addr>] [--remote-all]
-#   ./audit_main.sh --menu          (interactive mode)
-# ============================================================
+# Main script for the audit project
+# Author : belouadah saad eddine koussai 
 
 set -euo pipefail
 
-# ── Resolve absolute paths 
+# resolve script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/config.sh" # the config file that contains all the variables settings 
-source "${SCRIPT_DIR}/lib_colors.sh" # the color functions used to color the output 
-source "${SCRIPT_DIR}/hw_audit.sh" # the hardware audit functions 
-source "${SCRIPT_DIR}/sw_audit.sh" # the software audit functions 
-source "${SCRIPT_DIR}/report.sh" # the report generation functions 
-source "${SCRIPT_DIR}/email.sh" # the email functions 
-source "${SCRIPT_DIR}/remote.sh" # the remote audit functions 
 
-# ── Defaults (set the default values for the variables)
+# import other scripts
+source "${SCRIPT_DIR}/config.sh" 
+source "${SCRIPT_DIR}/lib_colors.sh" 
+source "${SCRIPT_DIR}/hw_audit.sh" 
+source "${SCRIPT_DIR}/sw_audit.sh" 
+source "${SCRIPT_DIR}/report.sh" 
+source "${SCRIPT_DIR}/email.sh" 
+source "${SCRIPT_DIR}/remote.sh" 
+
+# default values
 REPORT_TYPE="full"
 EMAIL_ADDR="saadbelouadahchess@gmail.com"
 DO_REMOTE_ALL=false
 INTERACTIVE=false
 
-# ── Argument parsing (help menu)
+# help message
 usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
@@ -41,7 +36,8 @@ usage() {
     exit 1
 }
 
-while [[ $# -gt 0 ]]; do # adjust the arguments of all options used by user 
+# parse arguments
+while [[ $# -gt 0 ]]; do 
     case "$1" in
         --short)      REPORT_TYPE="short" ;;
         --full)       REPORT_TYPE="full"  ;;
@@ -54,7 +50,7 @@ while [[ $# -gt 0 ]]; do # adjust the arguments of all options used by user
     shift
 done
 
-# ── Interactive menu (work if the user run the script with --menu options)
+# interactive menu
 interactive_menu() {
     while true; do
         echo ""
@@ -86,7 +82,7 @@ interactive_menu() {
     done
 }
 
-# ── Core audit runner 
+# audit runner
 run_audit() {
     log_info "Starting ${REPORT_TYPE} audit on $(hostname) at $(date)"
 
@@ -101,13 +97,13 @@ run_audit() {
 
     color_echo YELLOW "[ 4/4 ] Finalising..."
 
-    # Optional: email
+    # email report
     if [[ -n "${EMAIL_ADDR}" ]]; then
         color_echo YELLOW "  - Sending report to ${EMAIL_ADDR}..."
         send_report_email "${EMAIL_ADDR}" "${REPORT_TYPE}"
     fi
 
-    # Optional: remote audit on all hosts
+    # remote audit
     if "${DO_REMOTE_ALL}"; then
         color_echo YELLOW "  - Running audit on remote hosts..."
         run_remote_audit_all
@@ -142,14 +138,14 @@ view_last_report() {
     fi
 }
 
-# ── Startup prompts (always run in interactive mode) 
+# prompts at startup
 startup_prompts() {
     color_echo CYAN "========================================"
     color_echo CYAN "#   Linux Audit & Monitoring System    #"
     color_echo CYAN "========================================"
     echo ""
 
-    # ── Report type 
+    # report type
     color_echo BOLD "[ 1 / 3 ] Report type"
     echo "  1) Full report  (complete audit)"
     echo "  2) Short report (summary only)"
@@ -162,7 +158,7 @@ startup_prompts() {
     color_echo GREEN "  → ${REPORT_TYPE} report selected."
     echo ""
 
-    # ── Email 
+    # email
     color_echo BOLD "[ 2 / 3 ] Email delivery"
     read -rp "  Send report via email? [y/N]: " _yn
     if [[ "${_yn,,}" == "y" ]]; then
@@ -171,33 +167,23 @@ startup_prompts() {
             color_echo YELLOW "  ⚠  That doesn't look like a valid address."
             read -rp "  Re-enter (or leave blank to skip): " EMAIL_ADDR
         fi
-        if [[ -n "${EMAIL_ADDR}" ]]; then
-            color_echo GREEN "  - Report will be emailed to: ${EMAIL_ADDR}"
-        else
-            color_echo YELLOW "  - Email skipped."
-        fi
-    else
-        color_echo YELLOW "  - Email skipped."
     fi
     echo ""
 
-    # ── Remote audit 
+    # remote hosts
     color_echo BOLD "[ 3 / 3 ] Remote hosts audit"
     if [[ ${#REMOTE_HOSTS[@]} -gt 0 ]]; then
         echo "  ${#REMOTE_HOSTS[@]} host(s) found in config.sh"
         read -rp "  Run audit on all remote hosts? [y/N]: " _yn
         if [[ "${_yn,,}" == "y" ]]; then
             DO_REMOTE_ALL=true
-            color_echo GREEN "  - Will audit all remote hosts."
-        else
-            color_echo YELLOW "  - Remote audit skipped."
         fi
     else
         color_echo YELLOW "  - No remote hosts configured. Skipping."
     fi
     echo ""
 
-    # ── Confirm 
+    # confirm summary
     echo "-----------------------------------------"
     color_echo BOLD "  Summary before running:"
     printf "  %-18s %s\n" "Report type:"  "${REPORT_TYPE}"
@@ -213,14 +199,14 @@ startup_prompts() {
     echo ""
 }
 
-# ── Entry point 
+# main
 main() {
     mkdir -p "${REPORT_DIR}" "${LOG_DIR}"
 
     if "${INTERACTIVE}"; then
         interactive_menu
     else
-        # Always run startup prompts unless all options were passed via flags
+        # show prompts if not everything passed by flags
         if [[ -z "${EMAIL_ADDR}" ]] && ! "${DO_REMOTE_ALL}"; then
             startup_prompts
         fi

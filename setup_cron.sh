@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# ============================================================
-#  setup_cron.sh — Cron Job & Log Rotation Setup Helper
-#  Run once as root or the target user to install automation.
-# ============================================================
+# script to setup cron jobs and clean up old logs
 
 set -euo pipefail
 
@@ -11,38 +8,35 @@ source "${SCRIPT_DIR}/config.sh"
 source "${SCRIPT_DIR}/lib_colors.sh"
 
 AUDIT_CMD="${SCRIPT_DIR}/audit_main.sh --full"
-CRON_TAG="# sys_audit — managed entry"
+CRON_TAG="# sys_audit"
 
-# ── Install cron job 
+# add line to crontab
 install_cron() {
-    # Remove any previous sys_audit cron line to avoid duplicates
     ( crontab -l 2>/dev/null | grep -v "${CRON_TAG}" ; \
       echo "${CRON_SCHEDULE} ${AUDIT_CMD} >> ${LOG_DIR}/cron_exec.log 2>&1 ${CRON_TAG}" \
     ) | crontab -
 
-    color_echo GREEN "+ Cron job installed: ${CRON_SCHEDULE}  →  ${AUDIT_CMD}"
-    color_echo CYAN  "  View with: crontab -l"
+    color_echo GREEN "Cron job added: ${CRON_SCHEDULE}"
 }
 
-# ── Remove cron job 
+# clean up crontab
 remove_cron() {
     crontab -l 2>/dev/null | grep -v "${CRON_TAG}" | crontab - || true
     color_echo YELLOW "Cron job removed."
 }
 
-# ── Log rotation (manual) 
+# delete files older than rentention period
 rotate_logs() {
-    color_echo CYAN "Rotating logs older than ${LOG_RETENTION_DAYS} days in ${REPORT_DIR}..."
+    color_echo CYAN "Cleaning up logs older than ${LOG_RETENTION_DAYS} days..."
     find "${REPORT_DIR}" -type f -mtime "+${LOG_RETENTION_DAYS}" -delete
     find "${LOG_DIR}"    -type f -mtime "+${LOG_RETENTION_DAYS}" -delete
-    color_echo GREEN "+ Old logs removed."
+    color_echo GREEN "Logs rotated."
 }
 
-# ── Systemd logrotate config (optional) 
+# system logrotate config
 install_logrotate() {
     local conf="/etc/logrotate.d/sys_audit"
     if [[ $EUID -ne 0 ]]; then
-        log_warn "Root required to write to /etc/logrotate.d/. Skipping."
         return
     fi
 
@@ -53,69 +47,64 @@ ${REPORT_DIR}/*.txt ${LOG_DIR}/*.log {
     compress
     missingok
     notifempty
-    create 0640 root root
 }
 LOGROTATE
 
-    color_echo GREEN "+ logrotate config written to ${conf}"
+    color_echo GREEN "logrotate config written to ${conf}"
 }
 
-# ── Alert system: check CPU and send alert if over threshold ──
+# simple cpu alert
 check_cpu_alert() {
     local usage
     usage=$(top -bn1 2>/dev/null | grep "Cpu(s)" | awk '{print int(100-$8)}' || echo "0")
     if (( usage > CPU_ALERT_THRESHOLD )); then
-        local msg="⚠ CPU ALERT on $(hostname): usage is ${usage}% (threshold: ${CPU_ALERT_THRESHOLD}%)"
+        local msg="CPU ALERT: usage is ${usage}%"
         log_warn "${msg}"
         if [[ -n "${DEFAULT_EMAIL}" ]]; then
-            echo "${msg}" | mail -s "[SysAudit] CPU Alert — $(hostname)" "${DEFAULT_EMAIL}" 2>/dev/null || true
+            echo "${msg}" | mail -s "CPU Alert" "${DEFAULT_EMAIL}" 2>/dev/null || true
         fi
     fi
 }
 
-# ── Diff two reports 
+# compare two files
 diff_reports() {
     local r1="${1:-}"
     local r2="${2:-}"
     if [[ -z "${r1}" || -z "${r2}" ]]; then
-        echo "Usage: $0 diff <report1.txt> <report2.txt>"
+        echo "Usage: $0 diff <val1> <val2>"
         return 1
     fi
-    color_echo CYAN "Comparing reports:"
-    color_echo CYAN "  A: ${r1}"
-    color_echo CYAN "  B: ${r2}"
     diff --color=always "${r1}" "${r2}" || true
 }
 
-# ── Verify report integrity 
+# check sha256
 verify_report() {
     local report="${1:-}"
     if [[ -z "${report}" ]]; then
-        echo "Usage: $0 verify <report.txt>"
         return 1
     fi
     local hashfile="${report}.sha256"
     if [[ ! -f "${hashfile}" ]]; then
-        log_error "Hash file not found: ${hashfile}"
+        log_error "No hash file."
         return 1
     fi
     if sha256sum --check "${hashfile}" &>/dev/null; then
-        color_echo GREEN "+ Integrity OK: ${report}"
+        color_echo GREEN "Integrity OK."
     else
-        color_echo RED "- Integrity FAILED: ${report} — file may have been tampered!"
+        color_echo RED "Integrity check FAILED."
         return 1
     fi
 }
 
-# ── Entry point 
+# main loop
 case "${1:-install}" in
-    install)   install_cron; install_logrotate ;;
-    remove)    remove_cron ;;
-    rotate)    rotate_logs ;;
-    alert)     check_cpu_alert ;;
-    diff)      diff_reports "${2:-}" "${3:-}" ;;
-    verify)    verify_report "${2:-}" ;;
+    install|set) install_cron; install_logrotate ;;
+    remove|unset) remove_cron ;;
+    rotate|clean) rotate_logs ;;
+    alert|check) check_cpu_alert ;;
+    diff) diff_reports "${2:-}" "${3:-}" ;;
+    verify) verify_report "${2:-}" ;;
     *)
-        echo "Usage: $0 [install | remove | rotate | alert | diff <r1> <r2> | verify <report>]"
+        echo "Usage: $0 [install | remove | rotate | alert | diff | verify]"
         ;;
 esac
