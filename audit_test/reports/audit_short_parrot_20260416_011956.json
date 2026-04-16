@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "report_type": "short",
+    "hostname": "parrot",
+    "generated_at": "2026-04-16T01:19:56+0100",
+    "generated_by": "key",
+    "kernel": "6.19.6+parrot7-amd64"
+  },
+  "hardware": {
+    "cpu_model": "13th Gen Intel(R) Core(TM) i5-1335U\nN/A",
+    "cpu_arch": "x86_64",
+    "cpu_cores": "12",
+    "cpu_freq": "3751 MHzN/A",
+    "cpu_usage": "N/A",
+    "ram_total": "15.31 GB",
+    "ram_used": "5.8Gi",
+    "ram_available": "9.49 GB",
+    "swap_total": "5.39 GB",
+    "gpu": "None detected",
+    "uptime": "up 4 hours, 8 minutes"
+  },
+  "software": {
+    "os_name": "Parrot Security 7.1 (echo)",
+    "os_version": "7.1 (echo)",
+    "kernel": "6.19.6+parrot7-amd64",
+    "arch": "x86_64",
+    "pkg_manager": "dpkg/apt",
+    "pkg_count": "3666",
+    "timezone": "Africa/Algiers"
+  }
+}

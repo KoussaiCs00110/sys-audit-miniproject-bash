@@ -1,0 +1,14 @@
+[2026-04-16 01:19:49] [INFO]  Starting short audit on parrot at 16 أفريل, 2026 CET 01:19:49 ص
+[2026-04-16 01:19:49] [INFO]  Collecting hardware information...
+[2026-04-16 01:19:49] [INFO]  Hardware collection complete.
+[2026-04-16 01:19:49] [INFO]  Collecting OS & software information...
+[2026-04-16 01:19:56] [INFO]  Software collection complete.
+[2026-04-16 01:19:56] [INFO]  Reports saved: ./audit_test/reports/audit_short_parrot_20260416_011956.{txt,json,html}
+[2026-04-16 01:19:56] [ERROR] msmtp not found. Install: sudo apt install msmtp
+[2026-04-16 01:21:41] [INFO]  Starting short audit on parrot at 16 أفريل, 2026 CET 01:21:41 ص
+[2026-04-16 01:21:41] [INFO]  Collecting hardware information...
+[2026-04-16 01:21:41] [INFO]  Hardware collection complete.
+[2026-04-16 01:21:41] [INFO]  Collecting OS & software information...
+[2026-04-16 01:21:43] [INFO]  Software collection complete.
+[2026-04-16 01:21:43] [INFO]  Reports saved: ./audit_test/reports/audit_short_parrot_20260416_012143.{txt,json,html}
+[2026-04-16 01:21:43] [ERROR] msmtp not found. Install: sudo apt install msmtp

@@ -11,7 +11,11 @@ AUDIT_LOG="${LOG_DIR}/audit.log"
 
 # ── Email settings 
 # Set the default recipient; can be overridden via --email flag
+<<<<<<< HEAD
 DEFAULT_EMAIL="your@gmail.com"
+=======
+DEFAULT_EMAIL="saadbelouadahchess@gmail.com"
+>>>>>>> b517451 (Initial commit of Linux System Audit MiniProject)
 EMAIL_SUBJECT_PREFIX="[SysAudit]"
 # Mail tool: mail | mailx | msmtp | sendmail
 MAIL_TOOL="msmtp"
