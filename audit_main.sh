@@ -64,7 +64,8 @@ interactive_menu() {
             "Hardware Audit Only" \
             "Software Audit Only" \
             "Run Audit on All Remote Hosts" \
-            "Send Last Report via Email" \
+            "Send Last Local Report via Email" \
+            "Send Last Remote Report via Email" \
             "View Last Report" \
             "Exit"; do
             case $REPLY in
@@ -74,8 +75,9 @@ interactive_menu() {
                 4) sw_audit_only; break ;;
                 5) run_remote_audit_all; break ;;
                 6) prompt_email; break ;;
-                7) view_last_report; break ;;
-                8) color_echo GREEN "Goodbye."; exit 0 ;;
+                7) prompt_remote_email; break ;;
+                8) view_last_report; break ;;
+                9) color_echo GREEN "Goodbye."; exit 0 ;;
                 *) color_echo RED "Invalid choice." ;;
             esac
         done
@@ -128,14 +130,68 @@ prompt_email() {
     send_report_email "${EMAIL_ADDR}" "${REPORT_TYPE}"
 }
 
+prompt_remote_email() {
+    read -rp "Enter recipient email address: " EMAIL_ADDR
+    send_remote_report_email "${EMAIL_ADDR}"
+}
+
 view_last_report() {
-    local last
-    last=$(ls -t "${REPORT_DIR}"/*.txt 2>/dev/null | head -1 || true)
-    if [[ -z "${last}" ]]; then
+    echo ""
+    color_echo CYAN "Available reports in ${REPORT_DIR}:"
+    echo ""
+
+    # list recent reports grouped by base name
+    local last_txt last_html last_json
+    last_txt=$(ls -t "${REPORT_DIR}"/*.txt 2>/dev/null | head -1 || true)
+    last_html=$(ls -t "${REPORT_DIR}"/*.html 2>/dev/null | head -1 || true)
+    last_json=$(ls -t "${REPORT_DIR}"/*.json 2>/dev/null | head -1 || true)
+
+    if [[ -z "${last_txt}" && -z "${last_html}" && -z "${last_json}" ]]; then
         color_echo RED "No reports found in ${REPORT_DIR}"
-    else
-        less "${last}"
+        return
     fi
+
+    [[ -n "${last_txt}" ]]  && color_echo GREEN "  TXT:  ${last_txt}"
+    [[ -n "${last_json}" ]] && color_echo GREEN "  JSON: ${last_json}"
+    [[ -n "${last_html}" ]] && color_echo GREEN "  HTML: ${last_html}"
+    echo ""
+
+    select fmt in "View TXT" "View HTML (in browser)" "View JSON" "Back"; do
+        case $REPLY in
+            1)
+                if [[ -n "${last_txt}" ]]; then
+                    less "${last_txt}"
+                else
+                    color_echo RED "No TXT report found."
+                fi
+                break ;;
+            2)
+                if [[ -n "${last_html}" ]]; then
+                    if command -v xdg-open &>/dev/null; then
+                        xdg-open "${last_html}" 2>/dev/null &
+                        color_echo GREEN "  Opened in browser."
+                    else
+                        less "${last_html}"
+                    fi
+                else
+                    color_echo RED "No HTML report found."
+                fi
+                break ;;
+            3)
+                if [[ -n "${last_json}" ]]; then
+                    if command -v jq &>/dev/null; then
+                        jq '.' "${last_json}" | less
+                    else
+                        less "${last_json}"
+                    fi
+                else
+                    color_echo RED "No JSON report found."
+                fi
+                break ;;
+            4) break ;;
+            *) color_echo RED "Invalid choice." ;;
+        esac
+    done
 }
 
 # prompts at startup
